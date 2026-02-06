@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../models/message.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -10,19 +9,18 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final CollectionReference _messagesRef =
+  FirebaseFirestore.instance.collection('messages');
 
-  void _sendMessage() async {
+  void _sendMessage() {
     if (_messageController.text.isEmpty) return;
 
-    final message = Message(
-      text: _messageController.text,
-      senderId: _auth.currentUser?.uid ?? 'anonymous',
-      timestamp: DateTime.now(),
-    );
+    // Send to Firestore
+    _messagesRef.add({
+      'text': _messageController.text,
+      'timestamp': FieldValue.serverTimestamp(),
+    });
 
-    await _firestore.collection('messages').add(message.toMap());
     _messageController.clear();
   }
 
@@ -34,39 +32,30 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       body: Column(
         children: [
-          // Message List (Realtime)
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: _firestore
-                  .collection('messages')
-                  .orderBy('timestamp', descending: false)
-                  .snapshots(),
+              stream: _messagesRef.orderBy('timestamp').snapshots(),
               builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return Center(child: CircularProgressIndicator());
-                }
+                if (!snapshot.hasData) return Center(child: CircularProgressIndicator());
 
-                final docs = snapshot.data!.docs;
-
+                final messages = snapshot.data!.docs;
                 return ListView.builder(
-                  itemCount: docs.length,
+                  itemCount: messages.length,
                   itemBuilder: (context, index) {
-                    final data = docs[index].data()! as Map<String, dynamic>;
-                    final isMe = data['senderId'] == _auth.currentUser?.uid;
-
+                    final messageData = messages[index];
                     return Container(
                       margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                       child: Align(
-                        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                        alignment: Alignment.centerRight,
                         child: Container(
                           padding: EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: isMe ? Colors.blueAccent : Colors.grey[300],
+                            color: Colors.blueAccent,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            data['text'] ?? '',
-                            style: TextStyle(color: isMe ? Colors.white : Colors.black),
+                            messageData['text'] ?? '',
+                            style: TextStyle(color: Colors.white),
                           ),
                         ),
                       ),
@@ -76,7 +65,6 @@ class _ChatScreenState extends State<ChatScreen> {
               },
             ),
           ),
-          // Message Input
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Row(
