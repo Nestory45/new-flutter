@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../models/message.dart';
 
 class ChatScreen extends StatefulWidget {
   @override
@@ -7,13 +10,19 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
-  final List<String> _messages = [];
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  void _sendMessage() {
+  void _sendMessage() async {
     if (_messageController.text.isEmpty) return;
-    setState(() {
-      _messages.add(_messageController.text);
-    });
+
+    final message = Message(
+      text: _messageController.text,
+      senderId: _auth.currentUser?.uid ?? 'anonymous',
+      timestamp: DateTime.now(),
+    );
+
+    await _firestore.collection('messages').add(message.toMap());
     _messageController.clear();
   }
 
@@ -25,30 +34,49 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       body: Column(
         children: [
+          // Message List (Realtime)
           Expanded(
-            child: ListView.builder(
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                return Container(
-                  margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: Container(
-                      padding: EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.blueAccent,
-                        borderRadius: BorderRadius.circular(8),
+            child: StreamBuilder<QuerySnapshot>(
+              stream: _firestore
+                  .collection('messages')
+                  .orderBy('timestamp', descending: false)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return Center(child: CircularProgressIndicator());
+                }
+
+                final docs = snapshot.data!.docs;
+
+                return ListView.builder(
+                  itemCount: docs.length,
+                  itemBuilder: (context, index) {
+                    final data = docs[index].data()! as Map<String, dynamic>;
+                    final isMe = data['senderId'] == _auth.currentUser?.uid;
+
+                    return Container(
+                      margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                      child: Align(
+                        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                        child: Container(
+                          padding: EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: isMe ? Colors.blueAccent : Colors.grey[300],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            data['text'] ?? '',
+                            style: TextStyle(color: isMe ? Colors.white : Colors.black),
+                          ),
+                        ),
                       ),
-                      child: Text(
-                        _messages[index],
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    ),
-                  ),
+                    );
+                  },
                 );
               },
             ),
           ),
+          // Message Input
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Row(
