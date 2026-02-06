@@ -12,6 +12,9 @@ import 'screens/main_navigation_screen.dart';
 // Services
 import 'services/push_notification_service.dart';
 
+// Theme
+import 'theme/app_theme.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -50,14 +53,8 @@ class MyApp extends StatelessWidget {
         '/chat': (context) => ChatScreen(),
       },
 
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        scaffoldBackgroundColor: Colors.white,
-        appBarTheme: const AppBarTheme(
-          centerTitle: true,
-          elevation: 1,
-        ),
-      ),
+      // 🎨 GLOBAL THEME (Member 13)
+      theme: AppTheme.lightTheme,
     );
   }
 }
