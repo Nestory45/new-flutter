@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/message.dart';
 
 class ChatScreen extends StatefulWidget {
   @override
@@ -9,18 +7,21 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
-  final CollectionReference _messagesRef =
-  FirebaseFirestore.instance.collection('messages');
+  final List<String> _messages = [];
+  String roomName = 'General';
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final args = ModalRoute.of(context)!.settings.arguments;
+    if (args != null) roomName = args as String;
+  }
 
   void _sendMessage() {
     if (_messageController.text.isEmpty) return;
-
-    // Send to Firestore
-    _messagesRef.add({
-      'text': _messageController.text,
-      'timestamp': FieldValue.serverTimestamp(),
+    setState(() {
+      _messages.add(_messageController.text);
     });
-
     _messageController.clear();
   }
 
@@ -28,39 +29,30 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Chat'),
+        title: Text('Chat Room: $roomName'),
       ),
       body: Column(
         children: [
           Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: _messagesRef.orderBy('timestamp').snapshots(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) return Center(child: CircularProgressIndicator());
-
-                final messages = snapshot.data!.docs;
-                return ListView.builder(
-                  itemCount: messages.length,
-                  itemBuilder: (context, index) {
-                    final messageData = messages[index];
-                    return Container(
-                      margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: Container(
-                          padding: EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.blueAccent,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            messageData['text'] ?? '',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        ),
+            child: ListView.builder(
+              itemCount: _messages.length,
+              itemBuilder: (context, index) {
+                return Container(
+                  margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Container(
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blueAccent,
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                    );
-                  },
+                      child: Text(
+                        _messages[index],
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ),
                 );
               },
             ),
